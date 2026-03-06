@@ -1,0 +1,12 @@
+services:
+  pgmam:
+    build: .
+    image: pgmam-provider:local
+    container_name: pgmam-provider
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:${PORT:-8778}:8778"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

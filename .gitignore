@@ -1,0 +1,25 @@
+# Environment and local overrides
+.env
+.env.local
+
+# Python cache/build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+
+# Editor / OS noise
+.DS_Store
+
+# Runtime data
+data/*
+!data/.gitkeep

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ provider_title }} settings</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f3ea;
+        --panel: #fffdf7;
+        --ink: #1f1e1a;
+        --muted: #6b675d;
+        --line: #d8d0c0;
+        --accent: #a14312;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        background:
+          radial-gradient(circle at top right, rgba(161, 67, 18, 0.14), transparent 30%),
+          linear-gradient(180deg, var(--bg), #ebe5d7);
+        color: var(--ink);
+      }
+
+      main {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 40px 20px 60px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 28px;
+        box-shadow: 0 18px 40px rgba(56, 44, 20, 0.08);
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(2rem, 5vw, 3.25rem);
+        line-height: 1;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+        font-size: 1rem;
+      }
+
+      ul {
+        padding-left: 20px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+        margin-top: 24px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 18px;
+        background: rgba(255, 255, 255, 0.8);
+      }
+
+      .label {
+        color: var(--accent);
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+      }
+
+      code {
+        font-family: "SFMono-Regular", Menlo, monospace;
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="panel">
+        <h1>{{ provider_title }}</h1>
+        <p>Version {{ provider_version }}</p>
+        <p>
+          This settings page is read-only in Phase 1. Update the <code>.env</code> file and restart the
+          service to change configuration.
+        </p>
+        <div class="grid">
+          <article class="card">
+            <span class="label">Bind</span>
+            <code>{{ host }}:{{ port }}</code>
+          </article>
+          <article class="card">
+            <span class="label">Search Order</span>
+            <code>{{ search_order | join(", ") }}</code>
+          </article>
+        </div>
+        <div class="card" style="margin-top: 16px;">
+          <span class="label">Enabled Scrapers</span>
+          <ul>
+            {% for scraper in enabled_scrapers %}
+            <li>{{ scraper }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
+
