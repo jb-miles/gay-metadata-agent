@@ -103,6 +103,10 @@ class Settings:
     scenes_as_episodes: bool
     cache_search_ttl_seconds: int
     cache_metadata_ttl_seconds: int
+    audit_log_enabled: bool
+    audit_log_dir: str
+    audit_http_body_enabled: bool
+    audit_http_body_preview_chars: int
 
     @property
     def enabled_scrapers(self) -> list[str]:
@@ -150,6 +154,10 @@ def _build_settings() -> Settings:
         scenes_as_episodes=_parse_bool("SCENES_AS_EPISODES", False),
         cache_search_ttl_seconds=_parse_int("CACHE_SEARCH_TTL_SECONDS", 3600),
         cache_metadata_ttl_seconds=_parse_int("CACHE_METADATA_TTL_SECONDS", 86400),
+        audit_log_enabled=_parse_bool("AUDIT_LOG_ENABLED", True),
+        audit_log_dir=_get_env("AUDIT_LOG_DIR", "data/audit"),
+        audit_http_body_enabled=_parse_bool("AUDIT_HTTP_BODY_ENABLED", False),
+        audit_http_body_preview_chars=_parse_int("AUDIT_HTTP_BODY_PREVIEW_CHARS", 0),
     )
 
 

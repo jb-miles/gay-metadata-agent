@@ -5,6 +5,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 
 from src.config import get_settings
+from src.utils.audit import audit_event, summarize_metadata
 from src.models.containers import MediaContainer, MediaContainerEnvelope
 
 router = APIRouter(tags=["metadata"])
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 @router.get("/library/metadata/{rating_key}")
 async def get_metadata(rating_key: str, request: Request):
+    audit_event("lookup_started", lookup_type="metadata", rating_key=rating_key)
     metadata_service = request.app.state.metadata_service
     try:
         result = await metadata_service.get(rating_key)
@@ -23,6 +25,12 @@ async def get_metadata(rating_key: str, request: Request):
         raise HTTPException(status_code=500, detail="Metadata fetch failed")
 
     settings = get_settings()
+    audit_event(
+        "lookup_finished",
+        lookup_type="metadata",
+        rating_key=rating_key,
+        metadata=summarize_metadata(result),
+    )
     return MediaContainerEnvelope(
         MediaContainer=MediaContainer(
             offset=0,

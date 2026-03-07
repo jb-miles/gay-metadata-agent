@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 import logging
 
 from fastapi import FastAPI
+from asgi_correlation_id import CorrelationIdMiddleware
+import structlog
 
 from src.config import get_settings
 from src.routes.health import router as health_router
@@ -15,6 +17,7 @@ from src.routes.settings import router as settings_router
 from src.scrapers import init_scrapers, shutdown_scrapers
 from src.services.match_service import MatchService
 from src.services.metadata_service import MetadataService
+from src.utils.audit import audit_event
 from src.utils.http_client import build_http_client
 from src.utils.logger import configure_logging
 
@@ -24,6 +27,7 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     configure_logging(settings.log_level)
     logger = logging.getLogger(__name__)
+    structlog.contextvars.clear_contextvars()
 
     http_client = build_http_client()
     init_scrapers(http_client)
@@ -38,8 +42,15 @@ async def lifespan(app: FastAPI):
             "provider_version": settings.provider_version,
         },
     )
+    audit_event(
+        "provider_started",
+        provider_id=settings.provider_id,
+        provider_version=settings.provider_version,
+        provider_title=settings.provider_title,
+    )
     yield
     logger.info("stopping provider")
+    audit_event("provider_stopping")
     shutdown_scrapers()
     await http_client.aclose()
 
@@ -51,6 +62,24 @@ def create_app() -> FastAPI:
         version=settings.provider_version,
         lifespan=lifespan,
     )
+    app.add_middleware(
+        CorrelationIdMiddleware,
+        header_name="X-Request-ID",
+        update_request_header=True,
+    )
+
+    @app.middleware("http")
+    async def bind_request_context(request, call_next):
+        structlog.contextvars.clear_contextvars()
+        structlog.contextvars.bind_contextvars(
+            trace_id=request.headers.get("X-Request-ID"),
+            path=request.url.path,
+            method=request.method,
+        )
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request.headers.get("X-Request-ID", "")
+        return response
+
     app.include_router(provider_router)
     app.include_router(health_router)
     app.include_router(matches_router)
@@ -61,4 +90,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-
