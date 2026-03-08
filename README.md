@@ -1,14 +1,24 @@
 # Gay Adult Metadata Agent for Plex
 
-FastAPI-based Plex Custom Metadata Provider for gay adult media metadata.
+Standalone Plex Custom Metadata Provider for gay adult media.
 
-## What This Is
+This project replaces the legacy Python 2.7 Plex `.bundle` agents with a FastAPI service that Plex Media Server talks to over HTTP. Plex deprecated the old plugin framework and plans to remove legacy agent support in 2026. This provider is the migration path.
 
-This repository contains a standalone Plex metadata service for gay adult media. It replaces the deprecated Python 2.7 `.bundle` agents with a FastAPI service that Plex talks to over HTTP.
+See also:
+- [STATUS.md](./STATUS.md)
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
+- [docs/ROADMAP.md](./docs/ROADMAP.md)
+- [CONTRIBUTING.md](./CONTRIBUTING.md)
 
-Internal legacy working name: `PGMAM`. The public-facing project name is now `Gay Adult Metadata Agent for Plex`.
+## Current Status
 
-Current implemented sources include:
+Implemented and working today:
+- provider service, health endpoint, registration flow, Docker packaging
+- multi-source matching and metadata fetch
+- movie enrichment pipeline with GEVI-first reconciliation
+- summary source citations showing primary source plus secondary field enhancements
+
+Implemented sources:
 - `GEVI`
 - `AEBN`
 - `TLA`
@@ -19,41 +29,74 @@ Current implemented sources include:
 - `GayWorld`
 - `HFGPM`
 - `GEVIScenes`
+- `WayBig`
 - aggregators: `GayAdultFilms`, `GayAdultScenes`
 
-## Repo Layout
+Current work:
+- metadata completeness pass across tier 1-3 movie sources
+- normalization of release dates, producers, and scene/chapter behavior
 
-- `src/`: FastAPI app, models, routes, scrapers, services, utilities
-- `tests/`: test package scaffold
-- `docs/`: architecture and roadmap notes
-- `data/`: local runtime data mount, intentionally not committed
+## Requirements
 
-See:
-- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
-- [`docs/ROADMAP.md`](./docs/ROADMAP.md)
-- [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- Plex Media Server `1.43.0+`
+- Docker and Docker Compose plugin
+- a Plex auth token for provider registration
+- local network access from Plex to this provider
 
-## Local Setup
+The default deployment binds the provider to `127.0.0.1:8778`, which is the right setup when Plex and the provider run on the same host.
 
-1. Copy `.env.example` to `.env`.
-2. Adjust any local settings in `.env`.
-3. Install dependencies with `pip install -r requirements.txt`.
-4. Run the app with `uvicorn src.main:app --reload --host 127.0.0.1 --port 8778`.
-5. Verify:
-   - `GET /`
-   - `GET /health`
-   - `GET /settings`
-
-## Docker Compose
-
-The checked-in Compose workflow is the default local runtime:
+## Quick Start
 
 ```bash
+git clone https://github.com/jb-miles/gay-metadata-agent.git
+cd gay-metadata-agent
 cp .env.example .env
 docker compose up -d --build
 ```
 
-The service is published only on `127.0.0.1:8778`.
+After the container is up, register the provider with Plex:
+
+```bash
+python register.py --pms-token YOUR_PLEX_TOKEN
+```
+
+Then verify:
+
+```bash
+curl http://127.0.0.1:8778/health
+curl "http://127.0.0.1:32400/media/providers/metadata?X-Plex-Token=YOUR_PLEX_TOKEN"
+```
+
+## Deployment Guide
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/jb-miles/gay-metadata-agent.git
+cd gay-metadata-agent
+```
+
+### 2. Configure the Provider
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+The defaults are usable for same-host deployment. The most important settings are:
+- `HOST=127.0.0.1`
+- `PORT=8778`
+- `PROVIDER_ID=tv.plex.agents.custom.jb.miles.pgmam`
+- `SEARCH_ORDER=gevi,aebn,tla,gayempire,gayhotmovies,gayrado,waybig,geviscenes,gaymovie,hfgpm,gayworld`
+
+You can also enable or disable individual scrapers in `.env`.
+
+### 3. Build and Start the Service
+
+```bash
+docker compose up -d --build
+```
 
 Useful commands:
 
@@ -63,38 +106,96 @@ docker compose logs -f
 docker compose down
 ```
 
-## Plex Registration
+### 4. Get Your Plex Token
 
-Register the provider with Plex Media Server:
+You need a Plex token to register the provider.
+
+Common ways to get it:
+- from an existing Plex Web request in your browser developer tools
+- from the local Plex `Preferences.xml` on the PMS host
+- from another trusted Plex automation already using `X-Plex-Token`
+
+### 5. Register the Provider with Plex
+
+Minimal form:
 
 ```bash
 python register.py --pms-token YOUR_PLEX_TOKEN
 ```
 
-Optional flags:
+Explicit form:
 
 ```bash
 python register.py \
-  --pms-url http://localhost:32400 \
+  --pms-url http://127.0.0.1:32400 \
   --pms-token YOUR_PLEX_TOKEN \
-  --provider-url http://localhost:8778
+  --provider-url http://127.0.0.1:8778
 ```
 
-## Ad Hoc Docker
+If registration succeeds, Plex will list the provider under `/media/providers/metadata`.
 
-If you need a one-off container outside Compose:
+### 6. Verify the Service
+
+Check provider health:
 
 ```bash
-docker build -t pgmam-provider .
-docker run --rm -p 8778:8778 --name pgmam-provider pgmam-provider
+curl http://127.0.0.1:8778/health
 ```
 
-## Repo Hygiene
+Expected result:
 
-Local-only files are intentionally ignored:
-- `.env`
-- `data/`
-- Python cache directories
-- test/editor cache artifacts
+```json
+{"status":"ok","version":"2.0.0"}
+```
 
-Use `.env.example` as the committed configuration template.
+Confirm Plex sees the provider:
+
+```bash
+curl "http://127.0.0.1:32400/media/providers/metadata?X-Plex-Token=YOUR_PLEX_TOKEN"
+```
+
+### 7. Use It in Plex
+
+Create or edit a movie library in Plex and select the custom provider:
+- Provider ID: `tv.plex.agents.custom.jb.miles.pgmam`
+- Media type: currently all supported content is exposed as Plex movie metadata
+
+This project currently treats scenes as movies for compatibility with existing libraries.
+
+## Upgrading
+
+Pull the latest code and rebuild:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+You generally do not need to re-register the provider unless:
+- the provider URL changes
+- the provider ID changes
+- Plex loses the registration entry
+
+## Local Development
+
+If you do not want to use Docker:
+
+```bash
+cp .env.example .env
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn src.main:app --reload --host 127.0.0.1 --port 8778
+```
+
+## Known Limitations
+
+- only Plex movie metadata is supported right now
+- provider preferences are managed through `.env`, not Plex UI preferences
+- IAFD integration is intentionally out of scope
+- several lower-priority legacy sources are not yet ported
+- performer thumbnails are planned but not implemented yet
+
+## License
+
+See [LICENSE](./LICENSE).

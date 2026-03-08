@@ -5,6 +5,7 @@ import logging
 from src.config import get_settings
 from src.models.metadata import MetadataItem
 from src.scrapers import get_scraper
+from src.services.metadata_enrichment import build_enriched_metadata
 from src.utils.cache import TTLCache
 from src.utils.audit import audit_event, summarize_metadata
 from src.utils.guid import parse_rating_key
@@ -37,6 +38,11 @@ class MetadataService:
 
         audit_event("metadata_fetch_started", rating_key=rating_key, source=parsed.source)
         metadata = await scraper.get_metadata(parsed.source_id)
+        metadata = await build_enriched_metadata(
+            requested_rating_key=rating_key,
+            selected_source=parsed.source,
+            selected_metadata=metadata,
+        )
         self._cache.set(rating_key, metadata)
         audit_event(
             "metadata_fetch_finished",
